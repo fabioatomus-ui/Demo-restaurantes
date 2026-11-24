@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiosque & Restaurante Mar de Saquarema — Demonstração Comercial</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000;
+        background: #fff;
+        padding: 8px;
+      }
+    }
+    .tab-active {
+      background-color: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Barra Superior -->
+  <header class="bg-gradient-to-r from-sky-900 via-sky-800 to-teal-700 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🏖️</span>
+            <h1 class="font-bold text-lg md:text-xl tracking-tight">Mar de Saquarema — PDV & Comandas</h1>
+          </div>
+          <p class="text-xs text-sky-100">Amostra Interativa • Garçom / QR Code → Churrasqueira, Cozinha, Bar & Caixa</p>
+        </div>
+        <button onclick="resetDemo()" class="md:hidden text-xs bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-lg border border-white/20">
+          Resetar Demo
+        </button>
+      </div>
+
+      <!-- Navegação de Telas -->
+      <nav class="flex flex-wrap items-center gap-1.5 text-xs md:text-sm">
+        <button onclick="switchTab('garcom')" id="btn-tab-garcom" class="tab-btn tab-active px-3 py-2 rounded-lg font-medium transition">
+          📱 Garçom / Mesa
+        </button>
+        <button onclick="switchTab('qrcode')" id="btn-tab-qrcode" class="tab-btn bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg font-medium transition">
+          📲 Cardápio QR Code
+        </button>
+        <button onclick="switchTab('producao')" id="btn-tab-producao" class="tab-btn bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg font-medium transition relative">
+          🔥 Praças (Churrasco / Cozinha / Bar)
+          <span id="badge-producao" class="ml-1 bg-amber-400 text-slate-900 font-bold text-xs px-1.5 py-0.5 rounded-full">0</span>
+        </button>
+        <button onclick="switchTab('caixa')" id="btn-tab-caixa" class="tab-btn bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg font-medium transition">
+          💰 Mesas & Caixa
+        </button>
+        <button onclick="resetDemo()" class="hidden md:inline-flex text-xs bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg border border-white/20 ml-2">
+          🔄 Resetar Dados
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Toast de Notificação -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-sm font-medium border border-slate-700 max-w-sm"></div>
+
+  <!-- Área Principal -->
+  <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1">
+
+    <!-- ABA 1: GARÇOM / LANÇAMENTO DE PEDIDO -->
+    <section id="tab-garcom" class="tab-section">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Cardápio de Seleção -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="font-bold text-base text-slate-800">Lançamento Rápido do Garçom</h2>
+              <p class="text-xs text-slate-500">Cada grupo já cai direto no setor responsável (ou ajuste manualmente no carrinho).</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="garcom-mesa" class="text-xs font-semibold text-slate-600">Mesa:</label>
+              <select id="garcom-mesa" class="border border-slate-300 rounded-xl px-3 py-2 text-sm font-bold text-sky-900 bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <option value="Mesa 01 (Areia)">Mesa 01 (Areia)</option>
+                <option value="Mesa 02 (Areia)">Mesa 02 (Areia)</option>
+                <option value="Mesa 03 (Deck)">Mesa 03 (Deck)</option>
+                <option value="Mesa 04 (Deck)">Mesa 04 (Deck)</option>
+                <option value="Mesa 05 (Salão)">Mesa 05 (Salão)</option>
+                <option value="Mesa 06 (Salão)">Mesa 06 (Salão)</option>
+                <option value="Balcão / Viagem">Balcão / Viagem</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Filtro de Categoria -->
+          <div class="flex flex-wrap gap-2" id="garcom-filtros"></div>
+
+          <!-- Grid de Produtos -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="garcom-produtos"></div>
+        </div>
+
+        <!-- Carrinho do Garçom -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-fit sticky top-24 space-y-4">
+          <div class="flex items-center justify-between border-b pb-3">
+            <div>
+              <h3 class="font-bold text-slate-800">Comanda para Envio</h3>
+              <p class="text-xs text-slate-500">Confira os destinos antes de disparar</p>
+            </div>
+            <span id="carrinho-qtd" class="bg-sky-100 text-sky-800 font-bold text-xs px-2.5 py-1 rounded-full">0 itens</span>
+          </div>
+
+          <div id="carrinho-lista" class="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <p class="text-sm text-slate-400 text-center py-8">Toque nos itens ao lado para montar o pedido da mesa.</p>
+          </div>
+
+          <div class="border-t pt-3 space-y-3">
+            <div class="flex justify-between items-center text-base font-bold">
+              <span>Total deste envio:</span>
+              <span id="carrinho-total" class="text-sky-700">R$ 0,00</span>
+            </div>
+            <button onclick="enviarPedido('Garçom')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow transition flex items-center justify-center gap-2">
+              🚀 Disparar Pedido para Setores
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 2: CARDÁPIO QR CODE DO CLIENTE -->
+    <section id="tab-qrcode" class="tab-section hidden space-y-5">
+      <!-- Controle Administrativo do QR Code -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="inline-block text-[11px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md mb-1">
+            Simulação de Tela do Cliente na Mesa
+          </span>
+          <h2 class="font-bold text-lg text-slate-800">Cardápio Digital via QR Code</h2>
+          <p class="text-xs text-slate-500">Você pode habilitar ou bloquear o pedido direto pelo cliente a qualquer momento.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500">Mesa do QR Code:</label>
+            <select id="qr-mesa" class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm font-bold text-slate-800 bg-white">
+              <option value="Mesa 01 (Areia)">Mesa 01 (Areia)</option>
+              <option value="Mesa 02 (Areia)">Mesa 02 (Areia)</option>
+              <option value="Mesa 03 (Deck)">Mesa 03 (Deck)</option>
+              <option value="Mesa 04 (Deck)">Mesa 04 (Deck)</option>
+              <option value="Mesa 05 (Salão)">Mesa 05 (Salão)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 pl-2 border-l border-slate-300">
+            <span class="text-xs font-semibold text-slate-700">Pedido pelo cliente:</span>
+            <button id="btn-toggle-qr" onclick="togglePedidoCliente()" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-emerald-600 text-white">
+              ✅ HABILITADO
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual Mobile Centralizado -->
+      <div class="max-w-md mx-auto bg-white rounded-3xl shadow-lg border-4 border-slate-800 overflow-hidden">
+        <div class="bg-gradient-to-r from-teal-700 to-sky-800 text-white p-4 text-center">
+          <p class="text-xs uppercase tracking-widest text-sky-200">Bem-vindo ao</p>
+          <h3 class="font-bold text-xl">Quiosque Mar de Saquarema</h3>
+          <p id="qr-status-banner" class="mt-2 text-xs bg-emerald-500/20 border border-emerald-300/40 text-emerald-100 py-1 px-3 rounded-full inline-block">
+            Faça seu pedido direto da mesa!
+          </p>
+        </div>
+
+        <div id="qr-cardapio-lista" class="p-4 space-y-3 max-h-[460px] overflow-y-auto"></div>
+
+        <!-- Rodapé do Carrinho QR -->
+        <div id="qr-carrinho-box" class="bg-slate-900 text-white p-4 space-y-2">
+          <div class="flex justify-between items-center text-sm">
+            <span id="qr-carrinho-resumo" class="text-slate-300">Nenhum item selecionado</span>
+            <span id="qr-carrinho-total" class="font-bold text-amber-400">R$ 0,00</span>
+          </div>
+          <button onclick="enviarPedido('Cliente (QR Code)')" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition">
+            Enviar Pedido para a Cozinha / Bar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 3: PRAÇAS DE PRODUÇÃO (KDS) -->
+    <section id="tab-producao" class="tab-section hidden space-y-4">
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 class="font-bold text-lg text-slate-800">Monitor de Produção por Destino (KDS)</h2>
+          <p class="text-xs text-slate-500">Os itens de um mesmo pedido são separados automaticamente para cada estação.</p>
+        </div>
+        <span class="text-xs bg-sky-50 text-sky-800 border border-sky-200 px-3 py-1.5 rounded-xl font-medium">
+          Tempo real • Clique para avançar o status do preparo
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Coluna Churrasqueira -->
+        <div class="bg-orange-50/70 border border-orange-200 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-orange-200 pb-2">
+            <h3 class="font-bold text-orange-900 flex items-center gap-2">🔥 Churrasqueira</h3>
+            <span id="count-Churrasqueira" class="bg-orange-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="lista-Churrasqueira" class="space-y-3"></div>
+        </div>
+
+        <!-- Coluna Cozinha -->
+        <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-amber-200 pb-2">
+            <h3 class="font-bold text-amber-900 flex items-center gap-2">🍳 Cozinha (Porções & Pratos)</h3>
+            <span id="count-Cozinha" class="bg-amber-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="lista-Cozinha" class="space-y-3"></div>
+        </div>
+
+        <!-- Coluna Bar / Recepção -->
+        <div class="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-sky-200 pb-2">
+            <h3 class="font-bold text-sky-900 flex items-center gap-2">🍹 Bar & Recepção</h3>
+            <span id="count-Bar / Recepção" class="bg-sky-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="lista-Bar / Recepção" class="space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 4: MESAS & CAIXA -->
+    <section id="tab-caixa" class="tab-section hidden space-y-5">
+      <!-- Resumo Financeiro Rápido -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+          <p class="text-xs text-slate-500 font-medium">Consumo em Aberto nas Mesas</p>
+          <p id="kpi-aberto" class="text-2xl font-bold text-sky-700 mt-1">R$ 0,00</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+          <p class="text-xs text-slate-500 font-medium">Total Recebido no Caixa (Hoje)</p>
+          <p id="kpi-fechado" class="text-2xl font-bold text-emerald-600 mt-1">R$ 0,00</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+          <p class="text-xs text-slate-500 font-medium">Mesas Ativas Agora</p>
+          <p id="kpi-mesas" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+        </div>
+      </div>
+
+      <!-- Cards das Mesas -->
+      <div id="caixa-mesas-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Cupom Não Fiscal -->
+  <div id="modal-cupom" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-2">
+        <h3 class="font-bold text-slate-800">🧾 Cupom Não Fiscal (80mm)</h3>
+        <button onclick="fecharModalCupom()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+
+      <div id="print-area" class="bg-amber-50/70 border border-dashed border-slate-400 p-4 font-mono text-xs text-slate-900 whitespace-pre-wrap leading-relaxed"></div>
+
+      <div class="flex gap-2">
+        <button onclick="window.print()" class="flex-1 bg-sky-700 hover:bg-sky-800 text-white font-bold py-2.5 rounded-xl text-sm">
+          🖨️ Imprimir Térmica
+        </button>
+        <button onclick="fecharModalCupom()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-xl text-sm">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CARDAPIO = [
+      { id: 1, nome: "Picanha na Brasa (400g)", categoria: "Churrasco", destino: "Churrasqueira", preco: 89.90, desc: "Acompanha farofa, vinagrete e pão de alho" },
+      { id: 2, nome: "Espetinho de Carne / Frango", categoria: "Churrasco", destino: "Churrasqueira", preco: 16.00, desc: "Assado na hora na brasa" },
+      { id: 3, nome: "Coraçãozinho na Brasa (Porção)", categoria: "Churrasco", destino: "Churrasqueira", preco: 38.00, desc: "Com farofa da casa e limão" },
+      { id: 4, nome: "Isca de Peixe Crocante", categoria: "Porções & Pratos", destino: "Cozinha", preco: 64.00, desc: "Filé de pescada empanado com molho tártaro" },
+      { id: 5, nome: "Camarão ao Alho e Óleo", categoria: "Porções & Pratos", destino: "Cozinha", preco: 78.00, desc: "500g de camarão salteado com cheiro-verde" },
+      { id: 6, nome: "Batata Frita com Cheddar e Bacon", categoria: "Porções & Pratos", destino: "Cozinha", preco: 42.00, desc: "Porção generosa para compartilhar" },
+      { id: 7, nome: "Moqueca de Peixe (2 Pessoas)", categoria: "Porções & Pratos", destino: "Cozinha", preco: 118.00, desc: "Acompanha arroz branco e pirão" },
+      { id: 8, nome: "Cerveja 600ml (Estupidamente Gelada)", categoria: "Bebidas", destino: "Bar / Recepção", preco: 16.50, desc: "Original / Heineken / Brahma" },
+      { id: 9, nome: "Caipirinha de Limão / Maracujá", categoria: "Bebidas", destino: "Bar / Recepção", preco: 22.00, desc: "Cachaça artesanal ou vodka" },
+      { id: 10, nome: "Água de Coco Natural", categoria: "Bebidas", destino: "Bar / Recepção", preco: 10.00, desc: "Gelada na hora" },
+      { id: 11, nome: "Refrigerante Lata / Água Mineral", categoria: "Bebidas", destino: "Bar / Recepção", preco: 7.50, desc: "350ml / 500ml" }
+    ];
+
+    const STORAGE_KEY = "saquarema_restaurante_demo_v1";
+
+    let state = {
+      categoriaAtiva: "Todos",
+      carrinhoGarcom: [],
+      carrinhoQR: [],
+      qrPedidoHabilitado: true,
+      pedidos: [],
+      totalFechadoHoje: 345.50
+    };
+
+    function carregarEstado() {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (salvo) {
+        state = JSON.parse(salvo);
+      } else {
+        // Dados iniciais de exemplo para a apresentação já abrir viva
+        state.pedidos = [
+          {
+            id: 101,
+            mesa: "Mesa 01 (Areia)",
+            origem: "Garçom",
+            hora: "12:15",
+            itens: [
+              { nome: "Isca de Peixe Crocante", qtd: 1, preco: 64.00, destino: "Cozinha", obs: "Sem cebola no tártaro", status: "Em Preparo" },
+              { nome: "Cerveja 600ml (Estupidamente Gelada)", qtd: 2, preco: 16.50, destino: "Bar / Recepção", obs: "", status: "Pronto" }
+            ]
+          },
+          {
+            id: 102,
+            mesa: "Mesa 03 (Deck)",
+            origem: "Cliente (QR Code)",
+            hora: "12:22",
+            itens: [
+              { nome: "Picanha na Brasa (400g)", qtd: 1, preco: 89.90, destino: "Churrasqueira", obs: "Ao ponto", status: "Fila" },
+              { nome: "Caipirinha de Limão / Maracujá", qtd: 2, preco: 22.00, destino: "Bar / Recepção", obs: "Pouco açúcar", status: "Fila" }
+            ]
+          }
+        ];
+        salvarEstado();
+      }
+    }
+
+    function salvarEstado() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function resetDemo() {
+      localStorage.removeItem(STORAGE_KEY);
+      state = {
+        categoriaAtiva: "Todos",
+        carrinhoGarcom: [],
+        carrinhoQR: [],
+        qrPedidoHabilitado: true,
+        pedidos: [],
+        totalFechadoHoje: 345.50
+      };
+      carregarEstado();
+      renderTudo();
+      mostrarToast("Demonstração restaurada com dados iniciais!");
+    }
+
+    function formatarMoeda(valor) {
+      return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    function mostrarToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => el.classList.add("hidden"), 3200);
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll(".tab-section").forEach(s => s.classList.add("hidden"));
+      document.getElementById("tab-" + tab).classList.remove("hidden");
+
+      document.querySelectorAll(".tab-btn").forEach(b => {
+        b.classList.remove("tab-active");
+        b.classList.add("bg-white/10");
+      });
+      const activeBtn = document.getElementById("btn-tab-" + tab);
+      activeBtn.classList.add("tab-active");
+      activeBtn.classList.remove("bg-white/10");
+
+      renderTudo();
+    }
+
+    function corDestino(destino) {
+      if (destino === "Churrasqueira") return "bg-orange-100 text-orange-800 border-orange-200";
+      if (destino === "Cozinha") return "bg-amber-100 text-amber-800 border-amber-200";
+      return "bg-sky-100 text-sky-800 border-sky-200";
+    }
+
+    // --- GARÇOM ---
+    function renderGarcom() {
+      const categorias = ["Todos", "Churrasco", "Porções & Pratos", "Bebidas"];
+      document.getElementById("garcom-filtros").innerHTML = categorias.map(cat => `
+        <button onclick="filtrarCategoria('${cat}')"
+          class="px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${
+            state.categoriaAtiva === cat
+              ? "bg-sky-800 text-white border-sky-800"
+              : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+          }">
+          ${cat}
+        </button>
+      `).join("");
+
+      const filtrados = state.categoriaAtiva === "Todos"
+        ? CARDAPIO
+        : CARDAPIO.filter(p => p.categoria === state.categoriaAtiva);
+
+      document.getElementById("garcom-produtos").innerHTML = filtrados.map(prod => `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between gap-3 hover:border-sky-400 transition">
+          <div>
+            <div class="flex items-start justify-between gap-2">
+              <h4 class="font-bold text-slate-800 text-sm">${prod.nome}</h4>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full border ${corDestino(prod.destino)} shrink-0">
+                ${prod.destino}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">${prod.desc}</p>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+            <span class="font-bold text-sky-800">${formatarMoeda(prod.preco)}</span>
+            <button onclick="adicionarCarrinhoGarcom(${prod.id})"
+              class="bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition">
+              + Adicionar
+            </button>
+          </div>
+        </div>
+      `).join("");
+
+      const listaEl = document.getElementById("carrinho-lista");
+      const qtdTotal = state.carrinhoGarcom.reduce((acc, i) => acc + i.qtd, 0);
+      const valorTotal = state.carrinhoGarcom.reduce((acc, i) => acc + (i.preco * i.qtd), 0);
+
+      document.getElementById("carrinho-qtd").textContent = `${qtdTotal} ${qtdTotal === 1 ? "item" : "itens"}`;
+      document.getElementById("carrinho-total").textContent = formatarMoeda(valorTotal);
+
+      if (state.carrinhoGarcom.length === 0) {
+        listaEl.innerHTML = `<p class="text-sm text-slate-400 text-center py-8">Toque nos itens ao lado para montar o pedido da mesa.</p>`;
+        return;
+      }
+
+      listaEl.innerHTML = state.carrinhoGarcom.map((item, idx) => `
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+          <div class="flex justify-between items-start gap-2">
+            <div>
+              <p class="font-bold text-xs text-slate-800">${item.qtd}x ${item.nome}</p>
+              <p class="text-xs text-slate-500">${formatarMoeda(item.preco * item.qtd)}</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="alterarQtdGarcom(${idx}, -1)" class="w-6 h-6 rounded bg-slate-200 font-bold text-xs">-</button>
+              <button onclick="alterarQtdGarcom(${idx}, 1)" class="w-6 h-6 rounded bg-slate-200 font-bold text-xs">+</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold text-slate-600">Destino:</span>
+            <select onchange="alterarDestinoGarcom(${idx}, this.value)"
+              class="text-xs font-bold border border-slate-300 rounded-lg px-2 py-1 bg-white flex-1">
+              <option value="Churrasqueira" ${item.destino === "Churrasqueira" ? "selected" : ""}>🔥 Churrasqueira</option>
+              <option value="Cozinha" ${item.destino === "Cozinha" ? "selected" : ""}>🍳 Cozinha</option>
+              <option value="Bar / Recepção" ${item.destino === "Bar / Recepção" ? "selected" : ""}>🍹 Bar / Recepção</option>
+            </select>
+          </div>
+
+          <input type="text" value="${item.obs}" onchange="alterarObsGarcom(${idx}, this.value)"
+            placeholder="Obs: bem passado, sem gelo, dividir..."
+            class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white" />
+        </div>
+      `).join("");
+    }
+
+    function filtrarCategoria(cat) {
+      state.categoriaAtiva = cat;
+      renderGarcom();
+    }
+
+    function adicionarCarrinhoGarcom(prodId) {
+      const prod = CARDAPIO.find(p => p.id === prodId);
+      const existente = state.carrinhoGarcom.find(i => i.id === prod.id && i.destino === prod.destino && i.obs === "");
+      if (existente) {
+        existente.qtd += 1;
+      } else {
+        state.carrinhoGarcom.push({ ...prod, qtd: 1, obs: "" });
+      }
+      renderGarcom();
+    }
+
+    function alterarQtdGarcom(idx, delta) {
+      state.carrinhoGarcom[idx].qtd += delta;
+      if (state.carrinhoGarcom[idx].qtd <= 0) {
+        state.carrinhoGarcom.splice(idx, 1);
+      }
+      renderGarcom();
+    }
+
+    function alterarDestinoGarcom(idx, novoDestino) {
+      state.carrinhoGarcom[idx].destino = novoDestino;
+      renderGarcom();
+    }
+
+    function alterarObsGarcom(idx, obs) {
+      state.carrinhoGarcom[idx].obs = obs;
+    }
+
+    // --- QR CODE CLIENTE ---
+    function togglePedidoCliente() {
+      state.qrPedidoHabilitado = !state.qrPedidoHabilitado;
+      salvarEstado();
+      renderQRCode();
+      mostrarToast(
+        state.qrPedidoHabilitado
+          ? "Pedido pelo QR Code HABILITADO para os clientes!"
+          : "Pedido pelo QR Code BLOQUEADO (modo apenas visualização)."
+      );
+    }
+
+    function renderQRCode() {
+      const btn = document.getElementById("btn-toggle-qr");
+      const banner = document.getElementById("qr-status-banner");
+      const box = document.getElementById("qr-carrinho-box");
+
+      if (state.qrPedidoHabilitado) {
+        btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-emerald-600 text-white";
+        btn.textContent = "✅ HABILITADO";
+        banner.className = "mt-2 text-xs bg-emerald-500/20 border border-emerald-300/40 text-emerald-100 py-1 px-3 rounded-full inline-block";
+        banner.textContent = "Autoatendimento ativo • Peça direto da sua mesa!";
+        box.classList.remove("hidden");
+      } else {
+        btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-rose-600 text-white";
+        btn.textContent = "🔒 SOMENTE LEITURA";
+        banner.className = "mt-2 text-xs bg-amber-500/25 border border-amber-300/40 text-amber-100 py-1 px-3 rounded-full inline-block";
+        banner.textContent = "Cardápio digital • Chame o garçom para fazer seu pedido";
+        box.classList.add("hidden");
+      }
+
+      document.getElementById("qr-cardapio-lista").innerHTML = CARDAPIO.map(prod => {
+        const noCarrinho = state.carrinhoQR.find(i => i.id === prod.id);
+        return `
+          <div class="p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
+            <div>
+              <span class="text-[10px] font-bold uppercase text-sky-700">${prod.categoria}</span>
+              <h4 class="font-bold text-sm text-slate-800">${prod.nome}</h4>
+              <p class="text-xs text-slate-500">${prod.desc}</p>
+              <p class="font-bold text-sm text-emerald-700 mt-1">${formatarMoeda(prod.preco)}</p>
+            </div>
+            ${state.qrPedidoHabilitado ? `
+              <div class="flex items-center gap-1.5 shrink-0">
+                ${noCarrinho ? `
+                  <button onclick="alterarCarrinhoQR(${prod.id}, -1)" class="w-7 h-7 rounded-full bg-slate-200 font-bold text-sm">-</button>
+                  <span class="font-bold text-sm w-5 text-center">${noCarrinho.qtd}</span>
+                ` : ""}
+                <button onclick="alterarCarrinhoQR(${prod.id}, 1)" class="w-8 h-8 rounded-full bg-sky-700 text-white font-bold text-base">+</button>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+
+      const qtd = state.carrinhoQR.reduce((a, b) => a + b.qtd, 0);
+      const total = state.carrinhoQR.reduce((a, b) => a + (b.preco * b.qtd), 0);
+      document.getElementById("qr-carrinho-resumo").textContent = qtd > 0 ? `${qtd} item(ns) no pedido` : "Nenhum item selecionado";
+      document.getElementById("qr-carrinho-total").textContent = formatarMoeda(total);
+    }
+
+    function alterarCarrinhoQR(prodId, delta) {
+      const prod = CARDAPIO.find(p => p.id === prodId);
+      const idx = state.carrinhoQR.findIndex(i => i.id === prodId);
+      if (idx === -1 && delta > 0) {
+        state.carrinhoQR.push({ ...prod, qtd: 1, obs: "" });
+      } else if (idx !== -1) {
+        state.carrinhoQR[idx].qtd += delta;
+        if (state.carrinhoQR[idx].qtd <= 0) state.carrinhoQR.splice(idx, 1);
+      }
+      renderQRCode();
+    }
+
+    // --- ENVIO DE PEDIDO ---
+    function enviarPedido(origem) {
+      const isGarcom = origem === "Garçom";
+      const itensOrigem = isGarcom ? state.carrinhoGarcom : state.carrinhoQR;
+      const mesa = isGarcom
+        ? document.getElementById("garcom-mesa").value
+        : document.getElementById("qr-mesa").value;
+
+      if (itensOrigem.length === 0) {
+        mostrarToast("Adicione pelo menos 1 item antes de enviar!");
+        return;
+      }
+
+      const agora = new Date();
+      const hora = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+      const novoPedido = {
+        id: Math.floor(100 + Math.random() * 900),
+        mesa,
+        origem,
+        hora,
+        itens: itensOrigem.map(i => ({
+          nome: i.nome,
+          qtd: i.qtd,
+          preco: i.preco,
+          destino: i.destino,
+          obs: i.obs || "",
+          status: "Fila"
+        }))
+      };
+
+      state.pedidos.unshift(novoPedido);
+      if (isGarcom) state.carrinhoGarcom = [];
+      else state.carrinhoQR = [];
+
+      salvarEstado();
+      renderTudo();
+
+      const destinos = [...new Set(novoPedido.itens.map(i => i.destino))].join(", ");
+      mostrarToast(`✅ Pedido #${novoPedido.id} (${mesa}) enviado para: ${destinos}`);
+    }
+
+    // --- PRODUÇÃO (KDS) ---
+    function renderProducao() {
+      const destinos = ["Churrasqueira", "Cozinha", "Bar / Recepção"];
+      let pendentesGeral = 0;
+
+      destinos.forEach(dest => {
+        const cards = [];
+        state.pedidos.forEach((ped, pIdx) => {
+          ped.itens.forEach((item, iIdx) => {
+            if (item.destino === dest && item.status !== "Entregue") {
+              pendentesGeral++;
+              cards.push({ ped, item, pIdx, iIdx });
+            }
+          });
+        });
+
+        document.getElementById("count-" + dest).textContent = cards.length;
+        const container = document.getElementById("lista-" + dest);
+
+        if (cards.length === 0) {
+          container.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">Nenhum item pendente neste setor.</p>`;
+          return;
+        }
+
+        container.innerHTML = cards.map(({ ped, item, pIdx, iIdx }) => {
+          const isPreparo = item.status === "Em Preparo";
+          const isPronto = item.status === "Pronto";
+          const badge = isPronto
+            ? "bg-emerald-100 text-emerald-800"
+            : isPreparo
+              ? "bg-amber-200 text-amber-900"
+              : "bg-slate-200 text-slate-800";
+
+          const btnLabel = item.status === "Fila"
+            ? "▶ Iniciar Preparo"
+            : item.status === "Em Preparo"
+              ? "✅ Marcar Pronto"
+              : "🍽️ Entregue na Mesa";
+
+          return `
+            <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-xs text-sky-900">${ped.mesa}</span>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${badge}">${item.status}</span>
+              </div>
+              <div>
+                <p class="font-bold text-sm text-slate-800">${item.qtd}x ${item.nome}</p>
+                ${item.obs ? `<p class="text-xs text-rose-600 font-medium mt-0.5">⚠️ Obs: ${item.obs}</p>` : ""}
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t">
+                <span>Pedido #${ped.id} • ${ped.hora} (${ped.origem})</span>
+              </div>
+              <button onclick="avancarStatus(${pIdx}, ${iIdx})"
+                class="w-full py-2 rounded-lg text-xs font-bold transition ${
+                  isPronto
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    : "bg-slate-800 hover:bg-slate-900 text-white"
+                }">
+                ${btnLabel}
+              </button>
+            </div>
+          `;
+        }).join("");
+      });
+
+      document.getElementById("badge-producao").textContent = pendentesGeral;
+    }
+
+    function avancarStatus(pIdx, iIdx) {
+      const item = state.pedidos[pIdx].itens[iIdx];
+      if (item.status === "Fila") item.status = "Em Preparo";
+      else if (item.status === "Em Preparo") item.status = "Pronto";
+      else item.status = "Entregue";
+
+      salvarEstado();
+      renderTudo();
+    }
+
+    // --- CAIXA & MESAS ---
+    function renderCaixa() {
+      const mapaMesas = {};
+      state.pedidos.forEach(ped => {
+        if (!mapaMesas[ped.mesa]) {
+          mapaMesas[ped.mesa] = { mesa: ped.mesa, itens: [], total: 0 };
+        }
+        ped.itens.forEach(it => {
+          mapaMesas[ped.mesa].itens.push({ ...it, pedidoId: ped.id, origem: ped.origem });
+          mapaMesas[ped.mesa].total += it.preco * it.qtd;
+        });
+      });
+
+      const mesasAtivas = Object.values(mapaMesas);
+      const totalAberto = mesasAtivas.reduce((a, m) => a + m.total, 0);
+
+      document.getElementById("kpi-aberto").textContent = formatarMoeda(totalAberto);
+      document.getElementById("kpi-fechado").textContent = formatarMoeda(state.totalFechadoHoje);
+      document.getElementById("kpi-mesas").textContent = mesasAtivas.length;
+
+      const grid = document.getElementById("caixa-mesas-grid");
+      if (mesasAtivas.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400 text-sm">
+            Nenhuma mesa com consumo em aberto no momento. Lance um pedido na aba Garçom ou QR Code!
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = mesasAtivas.map(m => `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between border-b pb-2.5">
+              <h3 class="font-bold text-base text-slate-800">${m.mesa}</h3>
+              <span class="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">Aberta</span>
+            </div>
+
+            <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
+              ${m.itens.map(it => `
+                <div class="flex justify-between items-start text-xs border-b border-slate-100 pb-1.5">
+                  <div>
+                    <p class="font-semibold text-slate-800">${it.qtd}x ${it.nome}</p>
+                    <p class="text-[11px] text-slate-400">${it.destino} • Status: ${it.status}</p>
+                  </div>
+                  <span class="font-bold text-slate-700">${formatarMoeda(it.preco * it.qtd)}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <div class="pt-3 border-t space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-slate-500 font-semibold">Subtotal da Mesa:</span>
+              <span class="text-lg font-bold text-sky-900">${formatarMoeda(m.total)}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="abrirCupom('${m.mesa}')"
+                class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-xl text-xs transition">
+                🧾 Cupom Branco
+              </button>
+              <button onclick="fecharContaMesa('${m.mesa}')"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition">
+                💰 Receber & Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function abrirCupom(nomeMesa) {
+      const pedidosMesa = state.pedidos.filter(p => p.mesa === nomeMesa);
+      let subtotal = 0;
+      const linhas = [];
+
+      pedidosMesa.forEach(p => {
+        p.itens.forEach(it => {
+          const tot = it.preco * it.qtd;
+          subtotal += tot;
+          linhas.push(`${it.qtd}x ${it.nome.substring(0, 24)}
+   ${formatarMoeda(it.preco)} un  ->  ${formatarMoeda(tot)}`);
+        });
+      });
+
+      const taxa = subtotal * 0.10;
+      const totalComTaxa = subtotal + taxa;
+      const agora = new Date().toLocaleString("pt-BR");
+
+      const textoCupom = `================================
+  QUIOSQUE MAR DE SAQUAREMA
+  Orla de Saquarema - RJ
+  *** CUPOM NAO FISCAL ***
+================================
+Data: ${agora}
+${nomeMesa}
+--------------------------------
+ITENS CONSUMIDOS:
+${linhas.join("
+")}
+--------------------------------
+Subtotal:          ${formatarMoeda(subtotal)}
+Taxa Servico (10%):${formatarMoeda(taxa)}
+TOTAL A PAGAR:     ${formatarMoeda(totalComTaxa)}
+================================
+Obrigado pela preferencia!
+Documento sem valor fiscal.`;
+
+      document.getElementById("print-area").textContent = textoCupom;
+      const modal = document.getElementById("modal-cupom");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function fecharModalCupom() {
+      const modal = document.getElementById("modal-cupom");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    function fecharContaMesa(nomeMesa) {
+      let valorMesa = 0;
+      state.pedidos.forEach(p => {
+        if (p.mesa === nomeMesa) {
+          p.itens.forEach(it => valorMesa += it.preco * it.qtd);
+        }
+      });
+
+      state.pedidos = state.pedidos.filter(p => p.mesa !== nomeMesa);
+      state.totalFechadoHoje += valorMesa;
+      salvarEstado();
+      renderTudo();
+      mostrarToast(`💰 Conta da ${nomeMesa} fechada (${formatarMoeda(valorMesa)})!`);
+    }
+
+    function renderTudo() {
+      renderGarcom();
+      renderQRCode();
+      renderProducao();
+      renderCaixa();
+    }
+
+    carregarEstado();
+    renderTudo();
+  </script>
+</body>
+</html>
